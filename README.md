@@ -14,7 +14,7 @@ Turn Markdown-ish `.txt` sources into a submission-ready thesis: per-chapter sec
 - **Reference formatting** — `[n] ...` lines are typeset per template spec (12 pt, 1.25 line spacing, hanging indent by number width)
 - **Appendix handling** — auto writes the `附  录` H1 (kept in TOC) and demotes inner headings out of the TOC via `outlineLvl=9`
 - **Caption lines** (`表X-X` / `Table X-X` / `图X-X` / `Fig.X-X`) are centered without first-line indent
-- **Fonts** — body runs get `Times New Roman` (ascii/hAnsi) + `宋体` (eastAsia); headings keep template fonts
+- **Fonts** — body runs get `Times New Roman` (ascii/hAnsi) + `宋体` (eastAsia) **and 12 pt (小四, `sz/szCs=24`)**; captions/cells keep the template size (10.5 pt); headings keep template fonts
 - **Fields refresh** — `updateFields` is set so Word prompts to rebuild TOC and page numbers on open
 
 ## Requirements
@@ -73,7 +73,7 @@ templates/论文模板（带封面封底）.docx  # sample university template (
 ## Notes
 
 - Third/fourth-level headings (`x.y.z`, `x.y.z.w`) are emitted with 1.25× line spacing, 段前 205 twips, 段后 0.
-- Body paragraphs default to 20 pt exact line spacing to match the template; convert to another spec post-generation if your school requires it.
+- Body paragraphs are typeset at 12 pt (小四) with 20 pt exact line spacing; change the `BODY_PT` constant at the top of `merge_to_docx.py` to switch to another body size after generation if your school requires it.
 - The included template is for a Master's thesis in Architecture (Beijing University of Civil Engineering style); the script itself is template-agnostic as long as the section/header structure exists.
 
 ## License

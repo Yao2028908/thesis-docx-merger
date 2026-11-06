@@ -33,12 +33,16 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.text.paragraph import Paragraph
-from docx.shared import Cm
+from docx.shared import Cm, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 IMG_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.tiff'}
 TABLE_EXTS = {'.csv'}
 TEXT_EXTS = {'.txt', '.md', '.markdown'}
+
+# 正文字号（磅）：小四 = 12 磅 → w:sz/w:szCs = 24（半磅）
+# 模板 Normal 样式为五号(10.5磅/sz=21)，正文显式覆盖为小四，避免继承模板小字号
+BODY_PT = 12.0
 
 # ------------------------- 基础工具 -------------------------
 
@@ -169,6 +173,23 @@ def set_run_fonts(run, east='宋体'):
     rFonts = rPr.get_or_add_rFonts()
     rFonts.set(qn('w:eastAsia'), east)
 
+def set_run_size(run, pt):
+    """显式设置字号（磅）：同时写 w:sz 与 w:szCs，两者按 schema 顺序紧邻插入。
+    不能用 append —— rPr 中 sz/szCs 必须位于 vertAlign（上标）等元素之前，
+    否则 Word 判为非法 XML。run.font.size 由 python-docx 按 schema 顺序插入 w:sz。"""
+    half = str(int(round(pt * 2)))
+    run.font.size = Pt(pt)
+    rPr = run._r.get_or_add_rPr()
+    sz = rPr.find(qn('w:sz'))
+    if sz is None:
+        return
+    sz.set(qn('w:val'), half)
+    szCs = rPr.find(qn('w:szCs'))
+    if szCs is None:
+        szCs = OxmlElement('w:szCs')
+        sz.addnext(szCs)
+    szCs.set(qn('w:val'), half)
+
 # ------------------------- 标题识别 -------------------------
 
 MD_HEADING = re.compile(r'^(#{1,4})\s+(.*)$')
@@ -280,14 +301,16 @@ class CursorWriter:
 
     def _apply_body_fmt(self, par):
         """与模板正文一致的局部格式：20磅固定行距(line=400 exact) + 首行缩进2字符
-        （spacing 需在 ind 之前，符合 pPr 元素顺序）"""
+        （spacing 需在 ind 之前，符合 pPr 元素顺序）
+        首行缩进的 twips 兜底值随字号自适应：2字符 = 2 × 字号pt × 20 twips/磅
+        （小四12磅 → 480；五号10.5磅 → 420）"""
         pPr = par._p.get_or_add_pPr()
         sp = OxmlElement('w:spacing')
         sp.set(qn('w:line'), '400')
         sp.set(qn('w:lineRule'), 'exact')
         pPr.append(sp)
         ind = OxmlElement('w:ind')
-        ind.set(qn('w:firstLine'), '420')
+        ind.set(qn('w:firstLine'), str(int(round(BODY_PT * 40))))   # 2字符宽
         ind.set(qn('w:firstLineChars'), '200')
         pPr.append(ind)
 
@@ -295,6 +318,9 @@ class CursorWriter:
         par = self._new_par('body')
         self._apply_body_fmt(par)
         self._write_rich(par, text, sup_refs=sup_refs)
+        # 正文字号统一为小四（模板 Normal 为五号，需逐 run 覆盖）
+        for r in par.runs:
+            set_run_size(r, BODY_PT)
         return par
 
     def reference(self, text):
